@@ -7,7 +7,7 @@
 
 'use strict';
 
-if (process.env.NODE_ENV !== 'production') {
+if (true) {
   var invariant = require('fbjs/lib/invariant');
   var warning = require('fbjs/lib/warning');
   var ReactPropTypesSecret = require('./lib/ReactPropTypesSecret');
@@ -26,7 +26,7 @@ if (process.env.NODE_ENV !== 'production') {
  * @private
  */
 function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
-  if (process.env.NODE_ENV !== 'production') {
+  if (true) {
     for (var typeSpecName in typeSpecs) {
       if (typeSpecs.hasOwnProperty(typeSpecName)) {
         var error;
@@ -50,6 +50,7 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
           var stack = getStack ? getStack() : '';
 
           warning(false, 'Failed %s type: %s%s', location, error.message, stack != null ? stack : '');
+          throw error;
         }
       }
     }
