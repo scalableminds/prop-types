@@ -9,14 +9,14 @@
 
 'use strict';
 
-var React;
-var PropTypes;
+let React;
+let PropTypes;
 
 function resetWarningCache() {
   jest.resetModules();
 
   // Set production mode throughout this test.
-  process.env.NODE_ENV = 'production';  
+  process.env.NODE_ENV = 'production';
   React = require('react');
   // We are testing that when imported in the same way React 15 imports `prop-types`,
   // it just suppresses warnings but doesn't actually throw when calling validators.
@@ -30,11 +30,11 @@ function expectNoop(declaration, value) {
     console.error.calls.reset();
   }
 
-  var props = {testProp: value};
-  var propName = 'testProp' + Math.random().toString();
-  var componentName = 'testComponent' + Math.random().toString();
+  const props = {testProp: value};
+  const propName = 'testProp' + Math.random().toString();
+  const componentName = 'testComponent' + Math.random().toString();
   // Try calling it manually
-  for (var i = 0; i < 3; i++) {
+  for (let i = 0; i < 3; i++) {
     declaration(props, propName, componentName, 'prop');
   }
   // Try calling it via checkPropTypes
@@ -104,6 +104,9 @@ describe('PropTypesProductionReact15', () => {
 
     it('should not warn for valid values', () => {
       expectNoop(PropTypes.array, []);
+      if (typeof BigInt === 'function') {
+        expectNoop(PropTypes.bigint, BigInt(0));
+      }
       expectNoop(PropTypes.bool, false);
       expectNoop(PropTypes.func, function() {});
       expectNoop(PropTypes.number, 0);
@@ -121,6 +124,13 @@ describe('PropTypesProductionReact15', () => {
 
     it('should warn for missing required values', () => {
       expectNoop(PropTypes.string.isRequired);
+      expectNoop(PropTypes.array.isRequired);
+      expectNoop(PropTypes.symbol.isRequired);
+      expectNoop(PropTypes.number.isRequired);
+      expectNoop(PropTypes.bigint.isRequired);
+      expectNoop(PropTypes.bool.isRequired);
+      expectNoop(PropTypes.func.isRequired);
+      expectNoop(PropTypes.shape({}).isRequired);
     });
 
     it('should warn if called manually in development', () => {
@@ -131,6 +141,15 @@ describe('PropTypesProductionReact15', () => {
       expectNoop(PropTypes.array.isRequired, []);
       expectNoop(PropTypes.array.isRequired, null);
       expectNoop(PropTypes.array.isRequired, undefined);
+      expectNoop(PropTypes.bigint, function() {});
+      expectNoop(PropTypes.bigint, 42);
+      if (typeof BigInt === 'function') {
+        expectNoop(PropTypes.bigint, BigInt(42));
+      }
+      expectNoop(PropTypes.bigint.isRequired, function() {});
+      expectNoop(PropTypes.bigint.isRequired, 42);
+      expectNoop(PropTypes.bigint.isRequired, null);
+      expectNoop(PropTypes.bigint.isRequired, undefined);
       expectNoop(PropTypes.bool, []);
       expectNoop(PropTypes.bool, true);
       expectNoop(PropTypes.bool.isRequired, []);
@@ -171,7 +190,7 @@ describe('PropTypesProductionReact15', () => {
   });
 
   describe('Any type', () => {
-    it('should should accept any value', () => {
+    it('should accept any value', () => {
       expectNoop(PropTypes.any, 0);
       expectNoop(PropTypes.any, 'str');
       expectNoop(PropTypes.any, []);
@@ -206,6 +225,9 @@ describe('PropTypesProductionReact15', () => {
 
     it('should support the arrayOf propTypes', () => {
       expectNoop(PropTypes.arrayOf(PropTypes.number), [1, 2, 3]);
+      if (typeof BigInt === 'function') {
+        expectNoop(PropTypes.arrayOf(PropTypes.bigint), [BigInt(1), BigInt(2), BigInt(3)]);
+      }
       expectNoop(PropTypes.arrayOf(PropTypes.string), ['a', 'b', 'c']);
       expectNoop(PropTypes.arrayOf(PropTypes.oneOf(['a', 'b'])), ['a', 'b']);
       expectNoop(PropTypes.arrayOf(PropTypes.symbol), [Symbol(), Symbol()]);
@@ -235,7 +257,7 @@ describe('PropTypesProductionReact15', () => {
 
     it('should warn with invalid complex types', () => {
       function Thing() {}
-      var name = Thing.name || '<<anonymous>>';
+      const name = Thing.name || '<<anonymous>>';
 
       expectNoop(
         PropTypes.arrayOf(PropTypes.instanceOf(Thing)),
@@ -309,7 +331,6 @@ describe('PropTypesProductionReact15', () => {
   });
 
   describe('Component Type', () => {
-
     it('should support components', () => {
       expectNoop(PropTypes.element, <div />);
     });
@@ -327,6 +348,14 @@ describe('PropTypesProductionReact15', () => {
         'Invalid prop `testProp` of type `number` supplied to `testComponent`, ' +
           'expected a single ReactElement.',
       );
+      if (typeof BigInt === 'function') {
+        expectNoop(
+          PropTypes.element,
+          BigInt(123),
+          'Invalid prop `testProp` of type `bigint` supplied to `testComponent`, ' +
+            'expected a single ReactElement.',
+        );
+      }
       expectNoop(
         PropTypes.element,
         'foo',
@@ -366,9 +395,9 @@ describe('PropTypesProductionReact15', () => {
     it('should warn for invalid instances', () => {
       function Person() {}
       function Cat() {}
-      var personName = Person.name || '<<anonymous>>';
-      var dateName = Date.name || '<<anonymous>>';
-      var regExpName = RegExp.name || '<<anonymous>>';
+      const personName = Person.name || '<<anonymous>>';
+      const dateName = Date.name || '<<anonymous>>';
+      const regExpName = RegExp.name || '<<anonymous>>';
 
       expectNoop(
         PropTypes.instanceOf(Person),
@@ -463,7 +492,7 @@ describe('PropTypesProductionReact15', () => {
 
   describe('React Component Types', () => {
     it('should warn for invalid values', () => {
-      var failMessage = 'Invalid prop `testProp` supplied to ' +
+      const failMessage = 'Invalid prop `testProp` supplied to ' +
         '`testComponent`, expected a ReactNode.';
       expectNoop(PropTypes.node, true, failMessage);
       expectNoop(PropTypes.node, function() {}, failMessage);
@@ -497,12 +526,12 @@ describe('PropTypesProductionReact15', () => {
       MyComponent.prototype.render = function() {
         return <div />;
       };
-      var iterable = {
+      const iterable = {
         '@@iterator': function() {
-          var i = 0;
+          const i = 0;
           return {
             next: function() {
-              var done = ++i > 2;
+              const done = ++i > 2;
               return {value: done ? undefined : <MyComponent />, done: done};
             },
           };
@@ -517,12 +546,12 @@ describe('PropTypesProductionReact15', () => {
       MyComponent.prototype.render = function() {
         return <div />;
       };
-      var iterable = {
+      const iterable = {
         '@@iterator': function() {
-          var i = 0;
+          const i = 0;
           return {
             next: function() {
-              var done = ++i > 2;
+              const done = ++i > 2;
               return {
                 value: done ? undefined : ['#' + i, <MyComponent />],
                 done: done,
@@ -606,11 +635,18 @@ describe('PropTypesProductionReact15', () => {
         'Invalid prop `testProp.c` of type `string` supplied to `testComponent`, ' +
           'expected `number`.',
       );
+
+      expectNoop(
+        PropTypes.objectOf(PropTypes.number.isRequired),
+        {a: 1, b: 2, c: undefined},
+        'Warning: Failed prop type: The prop `testProp.c` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.'
+      );
     });
 
     it('should warn with invalid complex types', () => {
       function Thing() {}
-      var name = Thing.name || '<<anonymous>>';
+      const name = Thing.name || '<<anonymous>>';
 
       expectNoop(
         PropTypes.objectOf(PropTypes.instanceOf(Thing)),
@@ -619,6 +655,13 @@ describe('PropTypesProductionReact15', () => {
           '`testComponent`, expected instance of `' +
           name +
           '`.',
+      );
+
+      expectNoop(
+        PropTypes.objectOf(PropTypes.instanceOf(Thing).isRequired),
+        {a: new Thing(), b: undefined},
+        'Warning: Failed prop type: The prop `testProp.b` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.'
       );
     });
 
@@ -649,8 +692,18 @@ describe('PropTypesProductionReact15', () => {
       );
     });
 
+    it('should not warn when passing an object with no prototype', () => {
+      expectNoop(PropTypes.objectOf(PropTypes.number), Object.create(null));
+    });
+
     it('should not warn when passing an empty object', () => {
       expectNoop(PropTypes.objectOf(PropTypes.number), {});
+    });
+
+    it('should not warn when passing an object with a hasOwnProperty property', () => {
+      expectNoop(PropTypes.objectOf(PropTypes.number), {
+        hasOwnProperty: 3,
+      });
     });
 
     it('should be implicitly optional and not warn without values', () => {
@@ -718,6 +771,33 @@ describe('PropTypesProductionReact15', () => {
         'Invalid prop `testProp` of value `false` supplied to ' +
           '`testComponent`, expected one of [0,"false"].',
       );
+      expectNoop(
+        PropTypes.oneOf([Symbol('red'), Symbol('blue')]),
+        Symbol('green'),
+        'Invalid prop `testProp` of value `Symbol(green)` supplied to ' +
+          '`testComponent`, expected one of ["Symbol(red)","Symbol(blue)"].',
+      );
+      expectNoop(
+        PropTypes.oneOf([0, 'false']).isRequired,
+        undefined,
+        'Warning: Failed prop type: The prop `testProp` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.'
+      );
+      expectNoop(
+        PropTypes.oneOf([0, 'false']).isRequired,
+        null,
+        'Warning: Failed prop type: The prop `testProp` is marked as required in `testComponent`, ' +
+          'but its value is `null`.'
+      );
+    });
+
+    it('does not fail when the valid types contain null or undefined', () => {
+      expectNoop(
+        PropTypes.oneOf([0, 'false', null, undefined]),
+        false,
+        'Warning: Failed prop type: Invalid prop `testProp` of value `false` supplied to ' +
+          '`testComponent`, expected one of [0,"false",null,undefined].',
+      );
     });
 
     it('should not warn for valid values', () => {
@@ -760,7 +840,7 @@ describe('PropTypesProductionReact15', () => {
         'Invalid prop `testProp` supplied to `testComponent`.',
       );
 
-      var checker = PropTypes.oneOfType([
+      const checker = PropTypes.oneOfType([
         PropTypes.shape({a: PropTypes.number.isRequired}),
         PropTypes.shape({b: PropTypes.number.isRequired}),
       ]);
@@ -772,7 +852,7 @@ describe('PropTypesProductionReact15', () => {
     });
 
     it('should not warn if one of the types are valid', () => {
-      var checker = PropTypes.oneOfType([PropTypes.string, PropTypes.number]);
+      let checker = PropTypes.oneOfType([PropTypes.string, PropTypes.number]);
       expectNoop(checker, null);
       expectNoop(checker, 'foo');
       expectNoop(checker, 123);
@@ -871,6 +951,20 @@ describe('PropTypesProductionReact15', () => {
         'The prop `testProp.key` is marked as required in `testComponent`, ' +
           'but its value is `undefined`.',
       );
+
+      expectNoop(
+        PropTypes.shape({key: PropTypes.number.isRequired}),
+        {key: undefined},
+        'The prop `testProp.key` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.',
+      );
+
+      expectNoop(
+        PropTypes.shape({key: PropTypes.number.isRequired}),
+        {key: null},
+        'The prop `testProp.key` is marked as required in `testComponent`, ' +
+          'but its value is `null`.',
+      );
     });
 
     it('should warn for the first required type', () => {
@@ -929,6 +1023,119 @@ describe('PropTypesProductionReact15', () => {
     });
   });
 
+  describe('Exact Types', () => {
+    it('should warn for non objects', () => {
+      expectNoop(
+        PropTypes.exact({}),
+        'some string'
+      );
+      expectNoop(
+        PropTypes.exact({}),
+        ['array']
+      );
+    });
+
+    it('should not warn for empty values', () => {
+      expectNoop(PropTypes.exact({}), undefined);
+      expectNoop(PropTypes.exact({}), null);
+      expectNoop(PropTypes.exact({}), {});
+    });
+
+    it('should not warn for an empty object', () => {
+      expectNoop(PropTypes.exact({}).isRequired, {});
+    });
+
+    it('expectNoop warn for non specified types', () => {
+      expectNoop(
+        PropTypes.exact({}),
+        {key: 1}
+      );
+    });
+
+    it('should not warn for valid types', () => {
+      expectNoop(PropTypes.exact({key: PropTypes.number}), {key: 1});
+    });
+
+    it('should warn for required valid types', () => {
+      expectNoop(
+        PropTypes.exact({key: PropTypes.number.isRequired}),
+        {}
+      );
+    });
+
+    it('should warn for the first required type', () => {
+      expectNoop(
+        PropTypes.exact({
+          key: PropTypes.number.isRequired,
+          secondKey: PropTypes.number.isRequired,
+        }),
+        {}
+      );
+    });
+
+    it('should warn for invalid key types', () => {
+      expectNoop(
+        PropTypes.exact({key: PropTypes.number}),
+        {key: 'abc'}
+      );
+    });
+
+    it('should be implicitly optional and not warn without values', () => {
+      expectNoop(
+        PropTypes.exact(PropTypes.exact({key: PropTypes.number})),
+        null,
+      );
+      expectNoop(
+        PropTypes.exact(PropTypes.exact({key: PropTypes.number})),
+        undefined,
+      );
+    });
+
+    it('should warn for missing required values', () => {
+      expectNoop(
+        PropTypes.exact({key: PropTypes.number}).isRequired,
+      );
+    });
+
+    it('should warn if called manually in development', () => {
+      expectNoop(PropTypes.exact({}), 'some string');
+      expectNoop(PropTypes.exact({foo: PropTypes.number}), {
+        foo: 42,
+      });
+      expectNoop(
+        PropTypes.exact({key: PropTypes.number}).isRequired,
+        null,
+      );
+      expectNoop(
+        PropTypes.exact({key: PropTypes.number}).isRequired,
+        undefined,
+      );
+      expectNoop(PropTypes.element, <div />);
+    });
+
+    it('works with oneOfType', () => {
+      expectNoop(
+        PropTypes.exact({ foo: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }),
+        { foo: 42 }
+      );
+      expectNoop(
+        PropTypes.exact({ foo: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }),
+        { foo: '42' }
+      );
+      expectNoop(
+        PropTypes.exact({ foo: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }),
+        { foo: 42, bar: 'what is 6 * 7' }
+      );
+    });
+
+    it('works with a custom propType', () => {
+      expectNoop(
+        PropTypes.oneOfType([() => new Error('hi')]),
+        {}
+      )
+    });
+  });
+
   describe('Symbol Type', () => {
     it('should warn for non-symbol', () => {
       expectNoop(
@@ -954,8 +1161,30 @@ describe('PropTypesProductionReact15', () => {
     });
 
     it('should not warn for a polyfilled Symbol', () => {
-      var CoreSymbol = require('core-js/library/es6/symbol');
+      const CoreSymbol = require('core-js/library/es6/symbol');
       expectNoop(PropTypes.symbol, CoreSymbol('core-js'));
+    });
+  });
+
+  describe('checkPropTypes', function() {
+    describe('checkPropTypes.resetWarningCache', () => {
+      it('should provide empty function', () => {
+        spyOn(console, 'error');
+
+        var spy = jest.fn();
+        PropTypes.checkPropTypes.resetWarningCache();
+        expect(spy).not.toBeCalled();
+      });
+    });
+  });
+
+  describe('resetWarningCache', () => {
+    it('should provide empty function', () => {
+      spyOn(console, 'error');
+
+      var spy = jest.fn();
+      PropTypes.resetWarningCache();
+      expect(spy).not.toBeCalled();
     });
   });
 });
