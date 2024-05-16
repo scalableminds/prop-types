@@ -9,8 +9,8 @@
 
 'use strict';
 
-var React;
-var PropTypes;
+let React;
+let PropTypes;
 
 function resetWarningCache() {
   jest.resetModules();
@@ -18,6 +18,7 @@ function resetWarningCache() {
   React = require('react');
   PropTypes = require('../index');
 }
+resetWarningCache();
 
 function getPropTypeWarningMessage(propTypes, object, componentName) {
   if (!console.error.calls) {
@@ -27,7 +28,7 @@ function getPropTypeWarningMessage(propTypes, object, componentName) {
   }
   resetWarningCache();
 
-  PropTypes.checkPropTypes(propTypes, object, 'prop', 'testComponent');
+  PropTypes.checkPropTypes(propTypes, object, 'prop', componentName);
   const callCount = console.error.calls.count();
   if (callCount > 1) {
     throw new Error('Too many warnings.');
@@ -50,15 +51,15 @@ function typeCheckFail(declaration, value, expectedMessage) {
 }
 
 function typeCheckFailRequiredValues(declaration) {
-  var specifiedButIsNullMsg = 'The prop `testProp` is marked as required in ' +
+  const specifiedButIsNullMsg = 'The prop `testProp` is marked as required in ' +
     '`testComponent`, but its value is `null`.';
-  var unspecifiedMsg = 'The prop `testProp` is marked as required in ' +
+  const unspecifiedMsg = 'The prop `testProp` is marked as required in ' +
     '`testComponent`, but its value is \`undefined\`.';
 
-  var propTypes = {testProp: declaration};
+  const propTypes = {testProp: declaration};
 
   // Required prop is null
-  var message1 = getPropTypeWarningMessage(
+  const message1 = getPropTypeWarningMessage(
     propTypes,
     {testProp: null},
     'testComponent',
@@ -66,7 +67,7 @@ function typeCheckFailRequiredValues(declaration) {
   expect(message1).toContain(specifiedButIsNullMsg);
 
   // Required prop is undefined
-  var message2 = getPropTypeWarningMessage(
+  const message2 = getPropTypeWarningMessage(
     propTypes,
     {testProp: undefined},
     'testComponent',
@@ -74,7 +75,7 @@ function typeCheckFailRequiredValues(declaration) {
   expect(message2).toContain(unspecifiedMsg);
 
   // Required prop is not a member of props object
-  var message3 = getPropTypeWarningMessage(propTypes, {}, 'testComponent');
+  const message3 = getPropTypeWarningMessage(propTypes, {}, 'testComponent');
   expect(message3).toContain(unspecifiedMsg);
 }
 
@@ -91,7 +92,7 @@ function typeCheckPass(declaration, value) {
 
 function expectThrowsInDevelopment(declaration, value) {
   resetWarningCache();
-  var props = {testProp: value};
+  const props = {testProp: value};
   expect(() => {
     declaration(props, 'testProp', 'testComponent', 'prop');
   }).toThrowError(
@@ -99,6 +100,15 @@ function expectThrowsInDevelopment(declaration, value) {
     'Use `PropTypes.checkPropTypes()` to call them. ' +
     'Read more at http://fb.me/use-check-prop-types'
   );
+}
+
+function expectInvalidValidatorWarning(declaration, type) {
+  PropTypes.checkPropTypes({ foo: declaration }, { foo: {} }, 'prop', 'testComponent', null);
+  expect(console.error.calls.argsFor(0)[0]).toEqual(
+    'Warning: Failed prop type: testComponent: prop type `foo.bar` is invalid; '
+    + 'it must be a function, usually from the `prop-types` package, but received `' + type + '`.'
+  );
+  console.error.calls.reset();
 }
 
 describe('PropTypesDevelopmentStandalone', () => {
@@ -120,8 +130,54 @@ describe('PropTypesDevelopmentStandalone', () => {
       );
       expect(console.error.calls.argsFor(0)[0]).toEqual(
         'Warning: Failed prop type: testComponent: prop type `foo` is invalid; ' +
-        'it must be a function, usually from the `prop-types` package, but received `undefined`.'
+        'it must be a function, usually from the `prop-types` package, but received `undefined`.' +
+        'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.'
       );
+    });
+
+    it('should only warn once for identical validator failures', () => {
+      spyOn(console, 'error');
+      const propTypes = { foo: undefined };
+      const props = { foo: 'foo' };
+      PropTypes.checkPropTypes(
+        propTypes,
+        props,
+        'prop',
+        'testComponent',
+        null,
+      );
+      PropTypes.checkPropTypes(
+        propTypes,
+        props,
+        'prop',
+        'testComponent',
+        null,
+      );
+      expect(console.error.calls.count()).toEqual(1);
+    });
+
+    describe('checkPropTypes.resetWarningCache', () => {
+      it('should reset warning cache', () => {
+        spyOn(console, 'error')
+        const propTypes = { foo: undefined };
+        const props = { foo: 'foo' };
+        PropTypes.checkPropTypes(
+          propTypes,
+          props,
+          'prop',
+          'testComponent',
+          null,
+        );
+        PropTypes.checkPropTypes.resetWarningCache();
+        PropTypes.checkPropTypes(
+          propTypes,
+          props,
+          'prop',
+          'testComponent',
+          null,
+        );
+        expect(console.error.calls.count()).toEqual(2);
+      });
     });
 
     it('does not return a value from a validator', () => {
@@ -170,10 +226,51 @@ describe('PropTypesDevelopmentStandalone', () => {
       const props = { foo: 'foo' };
       const returnValue = PropTypes.checkPropTypes(propTypes, props, 'prop', 'testComponent', null);
       expect(console.error.calls.argsFor(0)[0]).toEqual(
-        'Warning: Failed prop type: testComponent: prop type `foo` is invalid; '
-        + 'it must be a function, usually from the `prop-types` package, but received `undefined`.'
+        'Warning: Failed prop type: testComponent: prop type `foo` is invalid; ' +
+        'it must be a function, usually from the `prop-types` package, but received `undefined`.' +
+        'This often happens because of typos such as `PropTypes.function` instead of `PropTypes.func`.'
       );
       expect(returnValue).toBe(undefined);
+    });
+
+    it('should warn for invalid validators inside shape', () => {
+      spyOn(console, 'error');
+      expectInvalidValidatorWarning(PropTypes.shape({ bar: PropTypes.invalid_type }), 'undefined');
+      expectInvalidValidatorWarning(PropTypes.shape({ bar: true }), 'boolean');
+      expectInvalidValidatorWarning(PropTypes.shape({ bar: 'true' }), 'string');
+      expectInvalidValidatorWarning(PropTypes.shape({ bar: null }), 'null');
+    });
+
+    it('should warn for invalid validators inside exact', () => {
+      spyOn(console, 'error');
+      expectInvalidValidatorWarning(PropTypes.exact({ bar: PropTypes.invalid_type }), 'undefined');
+      expectInvalidValidatorWarning(PropTypes.exact({ bar: true }), 'boolean');
+      expectInvalidValidatorWarning(PropTypes.exact({ bar: 'true' }), 'string');
+      expectInvalidValidatorWarning(PropTypes.exact({ bar: null }), 'null');
+    });
+  });
+
+  describe('resetWarningCache', () => {
+    it('should reset warning cache', () => {
+      spyOn(console, 'error');
+      const propTypes = { foo: undefined };
+      const props = { foo: 'foo' };
+      PropTypes.checkPropTypes(
+        propTypes,
+        props,
+        'prop',
+        'testComponent',
+        null,
+      );
+      PropTypes.resetWarningCache();
+      PropTypes.checkPropTypes(
+        propTypes,
+        props,
+        'prop',
+        'testComponent',
+        null,
+      );
+      expect(console.error.calls.count()).toEqual(2);
     });
   });
 
@@ -228,6 +325,9 @@ describe('PropTypesDevelopmentStandalone', () => {
 
     it('should not warn for valid values', () => {
       typeCheckPass(PropTypes.array, []);
+      if (typeof BigInt === 'function') {
+        typeCheckPass(PropTypes.bigint, BigInt(0));
+      }
       typeCheckPass(PropTypes.bool, false);
       typeCheckPass(PropTypes.func, function() {});
       typeCheckPass(PropTypes.number, 0);
@@ -245,6 +345,13 @@ describe('PropTypesDevelopmentStandalone', () => {
 
     it('should warn for missing required values', () => {
       typeCheckFailRequiredValues(PropTypes.string.isRequired);
+      typeCheckFailRequiredValues(PropTypes.array.isRequired);
+      typeCheckFailRequiredValues(PropTypes.symbol.isRequired);
+      typeCheckFailRequiredValues(PropTypes.number.isRequired);
+      typeCheckFailRequiredValues(PropTypes.bigint.isRequired);
+      typeCheckFailRequiredValues(PropTypes.bool.isRequired);
+      typeCheckFailRequiredValues(PropTypes.func.isRequired);
+      typeCheckFailRequiredValues(PropTypes.shape({}).isRequired);
     });
 
     it('should warn if called manually in development', () => {
@@ -255,6 +362,15 @@ describe('PropTypesDevelopmentStandalone', () => {
       expectThrowsInDevelopment(PropTypes.array.isRequired, []);
       expectThrowsInDevelopment(PropTypes.array.isRequired, null);
       expectThrowsInDevelopment(PropTypes.array.isRequired, undefined);
+      expectThrowsInDevelopment(PropTypes.bigint, function() {});
+      expectThrowsInDevelopment(PropTypes.bigint, 42);
+      if (typeof BigInt === 'function') {
+        expectThrowsInDevelopment(PropTypes.bigint, BigInt(42));
+      }
+      expectThrowsInDevelopment(PropTypes.bigint.isRequired, function() {});
+      expectThrowsInDevelopment(PropTypes.bigint.isRequired, 42);
+      expectThrowsInDevelopment(PropTypes.bigint.isRequired, null);
+      expectThrowsInDevelopment(PropTypes.bigint.isRequired, undefined);
       expectThrowsInDevelopment(PropTypes.bool, []);
       expectThrowsInDevelopment(PropTypes.bool, true);
       expectThrowsInDevelopment(PropTypes.bool.isRequired, []);
@@ -295,7 +411,7 @@ describe('PropTypesDevelopmentStandalone', () => {
   });
 
   describe('Any type', () => {
-    it('should should accept any value', () => {
+    it('should accept any value', () => {
       typeCheckPass(PropTypes.any, 0);
       typeCheckPass(PropTypes.any, 'str');
       typeCheckPass(PropTypes.any, []);
@@ -330,6 +446,9 @@ describe('PropTypesDevelopmentStandalone', () => {
 
     it('should support the arrayOf propTypes', () => {
       typeCheckPass(PropTypes.arrayOf(PropTypes.number), [1, 2, 3]);
+      if (typeof BigInt === 'function') {
+        typeCheckPass(PropTypes.arrayOf(PropTypes.bigint), [BigInt(1), BigInt(2), BigInt(3)]);
+      }
       typeCheckPass(PropTypes.arrayOf(PropTypes.string), ['a', 'b', 'c']);
       typeCheckPass(PropTypes.arrayOf(PropTypes.oneOf(['a', 'b'])), ['a', 'b']);
       typeCheckPass(PropTypes.arrayOf(PropTypes.symbol), [Symbol(), Symbol()]);
@@ -359,7 +478,7 @@ describe('PropTypesDevelopmentStandalone', () => {
 
     it('should warn with invalid complex types', () => {
       function Thing() {}
-      var name = Thing.name || '<<anonymous>>';
+      const name = Thing.name || '<<anonymous>>';
 
       typeCheckFail(
         PropTypes.arrayOf(PropTypes.instanceOf(Thing)),
@@ -433,7 +552,6 @@ describe('PropTypesDevelopmentStandalone', () => {
   });
 
   describe('Component Type', () => {
-
     it('should support components', () => {
       typeCheckPass(PropTypes.element, <div />);
     });
@@ -451,6 +569,14 @@ describe('PropTypesDevelopmentStandalone', () => {
         'Invalid prop `testProp` of type `number` supplied to `testComponent`, ' +
           'expected a single ReactElement.',
       );
+      if (typeof BigInt === 'function') {
+        typeCheckFail(
+          PropTypes.element,
+          BigInt(123),
+          'Invalid prop `testProp` of type `bigint` supplied to `testComponent`, ' +
+            'expected a single ReactElement.',
+        );
+      }
       typeCheckFail(
         PropTypes.element,
         'foo',
@@ -486,13 +612,84 @@ describe('PropTypesDevelopmentStandalone', () => {
     });
   });
 
+  describe('ElementType Types', () => {
+    it('should support native component', () => {
+      typeCheckPass(PropTypes.elementType, 'div');
+    });
+
+    it('should support stateless component', () => {
+      var MyComponent = () => <div />;
+      typeCheckPass(PropTypes.elementType, MyComponent);
+    });
+
+    it('should support stateful component', () => {
+      class MyComponent extends React.Component {
+        render() {
+          return <div />;
+        }
+      }
+      typeCheckPass(PropTypes.elementType, MyComponent);
+    });
+
+    (React.forwardRef ? it : it.skip)('should support forwardRef component', () => {
+      const MyForwardRef = React.forwardRef((props, ref) => <div ref={ref} />);
+      typeCheckPass(PropTypes.elementType, MyForwardRef);
+    });
+
+    (React.createContext ? it : it.skip)('should support context provider component', () => {
+      const MyContext = React.createContext('test');
+      typeCheckPass(PropTypes.elementType, MyContext.Provider);
+    });
+
+    (React.createContext ? it : it.skip)('should support context consumer component', () => {
+      const MyContext = React.createContext('test');
+      typeCheckPass(PropTypes.elementType, MyContext.Consumer);
+    });
+
+    it('should warn for invalid types', () => {
+      typeCheckFail(
+        PropTypes.elementType,
+        true,
+        'Invalid prop `testProp` of type `boolean` supplied to ' +
+          '`testComponent`, expected a single ReactElement type.',
+      );
+
+      typeCheckFail(
+        PropTypes.elementType,
+        {},
+        'Invalid prop `testProp` of type `object` supplied to ' +
+          '`testComponent`, expected a single ReactElement type.',
+      );
+
+      typeCheckFail(
+        PropTypes.elementType,
+        [],
+        'Invalid prop `testProp` of type `array` supplied to ' +
+          '`testComponent`, expected a single ReactElement type.',
+      );
+
+      it('should warn for missing required values', () => {
+        typeCheckFailRequiredValues(PropTypes.elementType.isRequired);
+      });
+    });
+
+    it('should warn for React element', () => {
+      typeCheckFail(
+        PropTypes.elementType,
+        <div />,
+        'Invalid prop `testProp` of type `object` supplied to ' +
+          '`testComponent`, expected a single ReactElement type.',
+      );
+    });
+  });
+
   describe('Instance Types', () => {
     it('should warn for invalid instances', () => {
       function Person() {}
       function Cat() {}
-      var personName = Person.name || '<<anonymous>>';
-      var dateName = Date.name || '<<anonymous>>';
-      var regExpName = RegExp.name || '<<anonymous>>';
+      const personName = Person.name || '<<anonymous>>';
+      const dateName = Date.name || '<<anonymous>>';
+      const regExpName = RegExp.name || '<<anonymous>>';
 
       typeCheckFail(
         PropTypes.instanceOf(Person),
@@ -587,7 +784,7 @@ describe('PropTypesDevelopmentStandalone', () => {
 
   describe('React Component Types', () => {
     it('should warn for invalid values', () => {
-      var failMessage = 'Invalid prop `testProp` supplied to ' +
+      const failMessage = 'Invalid prop `testProp` supplied to ' +
         '`testComponent`, expected a ReactNode.';
       typeCheckFail(PropTypes.node, true, failMessage);
       typeCheckFail(PropTypes.node, function() {}, failMessage);
@@ -621,12 +818,12 @@ describe('PropTypesDevelopmentStandalone', () => {
       MyComponent.prototype.render = function() {
         return <div />;
       };
-      var iterable = {
+      const iterable = {
         '@@iterator': function() {
-          var i = 0;
+          let i = 0;
           return {
             next: function() {
-              var done = ++i > 2;
+              const done = ++i > 2;
               return {value: done ? undefined : <MyComponent />, done: done};
             },
           };
@@ -641,12 +838,12 @@ describe('PropTypesDevelopmentStandalone', () => {
       MyComponent.prototype.render = function() {
         return <div />;
       };
-      var iterable = {
+      const iterable = {
         '@@iterator': function() {
-          var i = 0;
+          let i = 0;
           return {
             next: function() {
-              var done = ++i > 2;
+              const done = ++i > 2;
               return {
                 value: done ? undefined : ['#' + i, <MyComponent />],
                 done: done,
@@ -723,6 +920,12 @@ describe('PropTypesDevelopmentStandalone', () => {
       });
     });
 
+    it('should support objects with a null prototype', () => {
+      const nullObj = Object.create(null);
+      nullObj.test = 'a property';
+      typeCheckPass(PropTypes.objectOf(PropTypes.string), nullObj);
+    });
+
     it('should warn with invalid items in the object', () => {
       typeCheckFail(
         PropTypes.objectOf(PropTypes.number),
@@ -730,11 +933,18 @@ describe('PropTypesDevelopmentStandalone', () => {
         'Invalid prop `testProp.c` of type `string` supplied to `testComponent`, ' +
           'expected `number`.',
       );
+
+      typeCheckFail(
+        PropTypes.objectOf(PropTypes.number.isRequired),
+        {a: 1, b: 2, c: undefined},
+        'Warning: Failed prop type: The prop `testProp.c` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.'
+      );
     });
 
     it('should warn with invalid complex types', () => {
       function Thing() {}
-      var name = Thing.name || '<<anonymous>>';
+      const name = Thing.name || '<<anonymous>>';
 
       typeCheckFail(
         PropTypes.objectOf(PropTypes.instanceOf(Thing)),
@@ -743,6 +953,13 @@ describe('PropTypesDevelopmentStandalone', () => {
           '`testComponent`, expected instance of `' +
           name +
           '`.',
+      );
+
+      typeCheckFail(
+        PropTypes.objectOf(PropTypes.instanceOf(Thing).isRequired),
+        {a: new Thing(), b: undefined},
+        'Warning: Failed prop type: The prop `testProp.b` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.'
       );
     });
 
@@ -773,8 +990,18 @@ describe('PropTypesDevelopmentStandalone', () => {
       );
     });
 
+    it('should not warn when passing an object with no prototype', () => {
+      typeCheckPass(PropTypes.objectOf(PropTypes.number), Object.create(null));
+    });
+
     it('should not warn when passing an empty object', () => {
       typeCheckPass(PropTypes.objectOf(PropTypes.number), {});
+    });
+
+    it('should not warn when passing an object with a hasOwnProperty property', () => {
+      typeCheckPass(PropTypes.objectOf(PropTypes.number), {
+        hasOwnProperty: 3,
+      });
     });
 
     it('should be implicitly optional and not warn without values', () => {
@@ -811,11 +1038,25 @@ describe('PropTypesDevelopmentStandalone', () => {
     it('should warn but not error for invalid argument', () => {
       spyOn(console, 'error');
 
+      PropTypes.oneOf('red');
+
+      expect(console.error).toHaveBeenCalled();
+      expect(console.error.calls.argsFor(0)[0]).toContain(
+        'Invalid argument supplied to oneOf, expected an array.',
+      );
+
+      typeCheckPass(PropTypes.oneOf('red'), 'red');
+    });
+
+    it('should warn but not error for invalid multiple arguments', () => {
+      spyOn(console, 'error');
+
       PropTypes.oneOf('red', 'blue');
 
       expect(console.error).toHaveBeenCalled();
       expect(console.error.calls.argsFor(0)[0]).toContain(
-        'Invalid argument supplied to oneOf, expected an instance of array.',
+        'Invalid arguments supplied to oneOf, expected an array, got 2 arguments. '
+        + 'A common mistake is to write oneOf(x, y, z) instead of oneOf([x, y, z]).',
       );
 
       typeCheckPass(PropTypes.oneOf('red', 'blue'), 'red');
@@ -845,6 +1086,35 @@ describe('PropTypesDevelopmentStandalone', () => {
         false,
         'Invalid prop `testProp` of value `false` supplied to ' +
           '`testComponent`, expected one of [0,"false"].',
+      );
+      typeCheckFail(
+        PropTypes.oneOf([Symbol('red'), Symbol('blue')]),
+        Symbol('green'),
+        'Invalid prop `testProp` of value `Symbol(green)` supplied to ' +
+          '`testComponent`, expected one of ["Symbol(red)","Symbol(blue)"].',
+      );
+      typeCheckFail(
+        PropTypes.oneOf([0, 'false']).isRequired,
+        undefined,
+        'Warning: Failed prop type: The prop `testProp` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.'
+      );
+      typeCheckFail(
+        PropTypes.oneOf([0, 'false']).isRequired,
+        null,
+        'Warning: Failed prop type: The prop `testProp` is marked as required in `testComponent`, ' +
+          'but its value is `null`.'
+      );
+    });
+
+    it('does not fail when the valid types contain null or undefined', () => {
+      typeCheckFail(
+        PropTypes.oneOf([0, 'false', null, undefined]),
+        false,
+        'Warning: Failed prop type: Invalid prop `testProp` of value `false` supplied to ' +
+          '`testComponent`, expected one of [0,"false",null,null].',
+          // TODO: uncomment and fix implementation
+          // '`testComponent`, expected one of [0,"false",null,undefined].',
       );
     });
 
@@ -888,11 +1158,11 @@ describe('PropTypesDevelopmentStandalone', () => {
     it('should warn but for invalid argument type', () => {
       spyOn(console, 'error');
 
-      var types = [undefined, null, false, new Date, /foo/, {}];
-      var expected = ['undefined', 'null', 'a boolean', 'a date', 'a regexp', 'an object'];
+      const types = [undefined, null, false, new Date, /foo/, {}];
+      const expected = ['undefined', 'null', 'a boolean', 'a date', 'a regexp', 'an object'];
 
-      for (var i = 0; i < expected.length; i++) {
-        var type = types[i];
+      for (let i = 0; i < expected.length; i++) {
+        const type = types[i];
         PropTypes.oneOfType([type]);
         expect(console.error).toHaveBeenCalled();
         expect(console.error.calls.argsFor(0)[0]).toContain(
@@ -909,10 +1179,10 @@ describe('PropTypesDevelopmentStandalone', () => {
       typeCheckFail(
         PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
         [],
-        'Invalid prop `testProp` supplied to `testComponent`.',
+        'Invalid prop `testProp` supplied to `testComponent`, expected one of type [string, number].',
       );
 
-      var checker = PropTypes.oneOfType([
+      const checker = PropTypes.oneOfType([
         PropTypes.shape({a: PropTypes.number.isRequired}),
         PropTypes.shape({b: PropTypes.number.isRequired}),
       ]);
@@ -924,7 +1194,7 @@ describe('PropTypesDevelopmentStandalone', () => {
     });
 
     it('should not warn if one of the types are valid', () => {
-      var checker = PropTypes.oneOfType([PropTypes.string, PropTypes.number]);
+      let checker = PropTypes.oneOfType([PropTypes.string, PropTypes.number]);
       typeCheckPass(checker, null);
       typeCheckPass(checker, 'foo');
       typeCheckPass(checker, 123);
@@ -1012,6 +1282,20 @@ describe('PropTypesDevelopmentStandalone', () => {
         'The prop `testProp.key` is marked as required in `testComponent`, ' +
           'but its value is `undefined`.',
       );
+
+      typeCheckFail(
+        PropTypes.shape({key: PropTypes.number.isRequired}),
+        {key: undefined},
+        'The prop `testProp.key` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.',
+      );
+
+      typeCheckFail(
+        PropTypes.shape({key: PropTypes.number.isRequired}),
+        {key: null},
+        'The prop `testProp.key` is marked as required in `testComponent`, ' +
+          'but its value is `null`.',
+      );
     });
 
     it('should warn for the first required type', () => {
@@ -1070,6 +1354,141 @@ describe('PropTypesDevelopmentStandalone', () => {
     });
   });
 
+  describe('Exact Types', () => {
+    it('should warn for non objects', () => {
+      spyOn(console, 'error');
+      expectThrowsInDevelopment(
+        PropTypes.exact({}),
+        'some string'
+      );
+      expectThrowsInDevelopment(
+        PropTypes.exact({}),
+        ['array']
+      );
+    });
+
+    it('should not warn for empty values', () => {
+      typeCheckPass(PropTypes.exact({}), undefined);
+      typeCheckPass(PropTypes.exact({}), null);
+      typeCheckPass(PropTypes.exact({}), {});
+    });
+
+    it('should not warn for an empty object', () => {
+      typeCheckPass(PropTypes.exact({}).isRequired, {});
+    });
+
+    it('should warn for non specified types', () => {
+      typeCheckFail(
+        PropTypes.exact({}),
+        {key: 1},
+        'Warning: Failed prop type: Invalid prop `testProp` key `key` supplied to `testComponent`.' +
+        '\nBad object: {' +
+        '\n  \"key\": 1' +
+        '\n}' +
+        '\nValid keys: []'
+      );
+    });
+
+    it('should not warn for valid types', () => {
+      typeCheckPass(PropTypes.exact({key: PropTypes.number}), {key: 1});
+    });
+
+    it('should warn for required valid types', () => {
+      typeCheckFail(
+        PropTypes.exact({key: PropTypes.number.isRequired}),
+        {},
+        'The prop `testProp.key` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.',
+      );
+    });
+
+    it('should warn for the first required type', () => {
+      typeCheckFail(
+        PropTypes.exact({
+          key: PropTypes.number.isRequired,
+          secondKey: PropTypes.number.isRequired,
+        }),
+        {},
+        'The prop `testProp.key` is marked as required in `testComponent`, ' +
+          'but its value is `undefined`.',
+      );
+    });
+
+    it('should warn for invalid key types', () => {
+      typeCheckFail(
+        PropTypes.exact({key: PropTypes.number}),
+        {key: 'abc'},
+        'Invalid prop `testProp.key` of type `string` supplied to `testComponent`, ' +
+          'expected `number`.',
+      );
+    });
+
+    it('should be implicitly optional and not warn without values', () => {
+      typeCheckPass(
+        PropTypes.exact(PropTypes.exact({key: PropTypes.number})),
+        null,
+      );
+      typeCheckPass(
+        PropTypes.exact(PropTypes.exact({key: PropTypes.number})),
+        undefined,
+      );
+    });
+
+    it('should warn for missing required values', () => {
+      typeCheckFailRequiredValues(
+        PropTypes.exact({key: PropTypes.number}).isRequired,
+      );
+    });
+
+    it('should warn if called manually in development', () => {
+      spyOn(console, 'error');
+      expectThrowsInDevelopment(PropTypes.exact({}), 'some string');
+      expectThrowsInDevelopment(PropTypes.exact({foo: PropTypes.number}), {
+        foo: 42,
+      });
+      expectThrowsInDevelopment(
+        PropTypes.exact({key: PropTypes.number}).isRequired,
+        null,
+      );
+      expectThrowsInDevelopment(
+        PropTypes.exact({key: PropTypes.number}).isRequired,
+        undefined,
+      );
+      expectThrowsInDevelopment(PropTypes.element, <div />);
+    });
+
+    it('works with oneOfType', () => {
+      typeCheckPass(
+        PropTypes.exact({ foo: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }),
+        { foo: 42 }
+      );
+      typeCheckPass(
+        PropTypes.exact({ foo: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }),
+        { foo: '42' }
+      );
+      typeCheckFail(
+        PropTypes.exact({ foo: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }),
+        { foo: 42, bar: 'what is 6 * 7' },
+        `Warning: Failed prop type: Invalid prop \`testProp\` key \`bar\` supplied to \`testComponent\`.
+Bad object: {
+  "foo": 42,
+  "bar": "what is 6 * 7"
+}
+Valid keys: [
+  "foo"
+]`
+      );
+    });
+
+    it('works with a custom propType', () => {
+      typeCheckFail(
+        PropTypes.oneOfType([() => new Error('hi')]),
+        {},
+        'Warning: Failed prop type: Invalid prop `testProp` supplied to `testComponent`.'
+      )
+    });
+  });
+
   describe('Symbol Type', () => {
     it('should warn for non-symbol', () => {
       typeCheckFail(
@@ -1095,7 +1514,7 @@ describe('PropTypesDevelopmentStandalone', () => {
     });
 
     it('should not warn for a polyfilled Symbol', () => {
-      var CoreSymbol = require('core-js/library/es6/symbol');
+      const CoreSymbol = require('core-js/library/es6/symbol');
       typeCheckPass(PropTypes.symbol, CoreSymbol('core-js'));
     });
   });
