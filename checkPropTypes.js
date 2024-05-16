@@ -95,7 +95,7 @@ function checkPropTypes(typeSpecs, values, location, componentName, getStack) {
  * @private
  */
 checkPropTypes.resetWarningCache = function() {
-  if (process.env.NODE_ENV !== 'production') {
+  if (true) {
     loggedTypeFailures = {};
   }
 }

@@ -16,7 +16,7 @@ var checkPropTypes = require('./checkPropTypes');
 
 var printWarning = function() {};
 
-if (process.env.NODE_ENV !== 'production') {
+if (true) {
   printWarning = function(text) {
     var message = 'Warning: ' + text;
     if (typeof console !== 'undefined') {
